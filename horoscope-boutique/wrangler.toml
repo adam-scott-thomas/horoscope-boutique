@@ -21,8 +21,8 @@ DELIVERY_MODE = "email"  # Options: "sms", "email", "both", "couple_sms", "coupl
 EMAIL_PROVIDER = "mailgun"  # Options: "mailgun", "sendgrid"
 
 # Single person configuration
-RECIPIENT_NAME = "Friend"
-RECIPIENT_SIGN = "Aries"
+RECIPIENT_NAME = "Jennifer"
+RECIPIENT_SIGN = "Leo"
 
 # Couples configuration (if using couples mode)
 # COUPLE_NAME_1 = "Alex"
