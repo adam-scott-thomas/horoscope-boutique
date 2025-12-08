@@ -1,0 +1,36 @@
+{
+  "name": "horoscope-boutique",
+  "version": "1.0.0",
+  "description": "Production-ready horoscope subscription service on Cloudflare infrastructure",
+  "main": "src/worker.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "db:create": "wrangler d1 create horoscope-boutique-db",
+    "db:execute": "wrangler d1 execute horoscope-boutique-db --file=./schema.sql",
+    "db:query": "wrangler d1 execute horoscope-boutique-db --command",
+    "pages:dev": "wrangler pages dev public",
+    "pages:deploy": "wrangler pages deploy public --project-name=horoscope-boutique"
+  },
+  "keywords": [
+    "horoscope",
+    "astrology",
+    "cloudflare-workers",
+    "cloudflare-pages",
+    "d1",
+    "sms",
+    "email",
+    "subscription",
+    "daily"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.22.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
