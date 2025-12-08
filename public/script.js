@@ -151,7 +151,7 @@ function setupFormSubmission() {
 
     try {
       // Submit to API
-      const response = await fetch('https://api.horoscope.boutique/api/signup', {
+      const response = await fetch('/api/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
