@@ -4,7 +4,7 @@ compatibility_date = "2024-01-01"
 
 # Account ID - Replace with your Cloudflare Account ID
 # Find it at: https://dash.cloudflare.com/ -> Select your account -> Account ID in the right sidebar
-# account_id = "YOUR_ACCOUNT_ID_HERE"
+account_id = "8e85016b2a4efd16bd9d29f96363339a"
 
 # Workers configuration
 workers_dev = true
@@ -17,12 +17,12 @@ crons = ["0 14 * * *"]
 
 # Environment variables (non-sensitive)
 [vars]
-DELIVERY_MODE = "sms"  # Options: "sms", "email", "both", "couple_sms", "couple_email", "couple_both"
+DELIVERY_MODE = "email"  # Options: "sms", "email", "both", "couple_sms", "couple_email", "couple_both"
 EMAIL_PROVIDER = "mailgun"  # Options: "mailgun", "sendgrid"
 
 # Single person configuration
-RECIPIENT_NAME = "Friend"
-RECIPIENT_SIGN = "Aries"
+RECIPIENT_NAME = "Jennifer"
+RECIPIENT_SIGN = "Leo"
 
 # Couples configuration (if using couples mode)
 # COUPLE_NAME_1 = "Alex"
