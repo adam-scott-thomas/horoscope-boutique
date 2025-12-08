@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horoscope Boutique - Daily Horoscopes Delivered to Your Inbox</title>
+    <meta name="description" content="Get personalized daily horoscopes delivered via email or SMS at 9 AM your local time. Free, uplifting, and insightful.">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="logo">✨ Horoscope Boutique</h1>
+            <p class="tagline">Your daily dose of cosmic wisdom</p>
+        </header>
+
+        <main class="main">
+            <section class="hero">
+                <h2>Start Your Day with Clarity</h2>
+                <p>Receive personalized horoscopes every morning at 9 AM in your timezone. Uplifting, insightful, and always positive.</p>
+            </section>
+
+            <section class="signup-section">
+                <form id="signupForm" class="signup-form">
+                    <div class="form-group">
+                        <label for="email">Email Address *</label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            placeholder="you@example.com"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">Phone Number *</label>
+                        <input
+                            type="tel"
+                            id="phone"
+                            name="phone"
+                            placeholder="+1 202 555 1234"
+                            required
+                        >
+                        <small>Required for SMS delivery. Use international format (e.g., +1 for US/Canada)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="birthdate">Birthday *</label>
+                        <input
+                            type="date"
+                            id="birthdate"
+                            name="birthdate"
+                            required
+                        >
+                        <small>We'll automatically determine your zodiac sign</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="first_name">First Name (optional)</label>
+                        <input
+                            type="text"
+                            id="first_name"
+                            name="first_name"
+                            placeholder="Your name"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="timezone">Timezone *</label>
+                        <select id="timezone" name="timezone" required>
+                            <option value="">Detecting...</option>
+                        </select>
+                        <small>We'll send your horoscope at 9 AM in your timezone</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Delivery Method *</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="delivery_method" value="email" checked>
+                                <span>Email only</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="delivery_method" value="sms">
+                                <span>SMS only</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="delivery_method" value="both">
+                                <span>Both Email & SMS</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input
+                                type="checkbox"
+                                id="consent"
+                                name="consent"
+                                required
+                            >
+                            <span>I agree to receive daily horoscope messages *</span>
+                        </label>
+                        <small>You can unsubscribe anytime</small>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="submitBtn">
+                        Get My Daily Horoscope
+                    </button>
+
+                    <div id="message" class="message"></div>
+                </form>
+            </section>
+
+            <section class="features">
+                <div class="feature">
+                    <div class="feature-icon">🌟</div>
+                    <h3>Personalized</h3>
+                    <p>Based on your zodiac sign, derived from your birthday</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⏰</div>
+                    <h3>Timely</h3>
+                    <p>Delivered at 9 AM in your local timezone</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">💜</div>
+                    <h3>Positive</h3>
+                    <p>Uplifting and encouraging, never negative</p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2025 Horoscope Boutique. Made with ❤️ and cosmic energy.</p>
+            <p><a href="/api/unsubscribe">Unsubscribe</a></p>
+        </footer>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+</html>

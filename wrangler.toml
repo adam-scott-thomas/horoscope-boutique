@@ -1,0 +1,99 @@
+# ========================================
+# HOROSCOPE BOUTIQUE - CLOUDFLARE CONFIG
+# ========================================
+# Production-ready configuration for:
+# - Cloudflare Pages (frontend)
+# - Cloudflare Workers (API)
+# - Cloudflare D1 (database)
+# - Scheduled cron (hourly)
+
+name = "horoscope-boutique"
+main = "src/worker.js"
+compatibility_date = "2024-01-15"
+
+# Account ID - REQUIRED
+# Find at: https://dash.cloudflare.com/ → Account ID
+# account_id = "YOUR_ACCOUNT_ID_HERE"
+
+# Workers configuration
+workers_dev = true
+
+# ========================================
+# D1 DATABASE BINDING
+# ========================================
+# After creating your D1 database, add the binding here
+[[d1_databases]]
+binding = "DB"
+database_name = "horoscope-boutique-db"
+database_id = "YOUR_DATABASE_ID_HERE"
+
+# ========================================
+# SCHEDULED CRON TRIGGER
+# ========================================
+# Runs every hour to check for users at 9:00 AM local time
+[triggers]
+crons = ["0 * * * *"]  # Every hour at minute 0
+
+# ========================================
+# ROUTES & PAGES INTEGRATION
+# ========================================
+# If using Cloudflare Pages, the API will be available at /api/*
+# Frontend files in /public will be served by Pages
+
+# ========================================
+# ENVIRONMENT VARIABLES (Public)
+# ========================================
+[vars]
+# These are non-sensitive variables
+ENVIRONMENT = "production"
+
+# ========================================
+# SECRETS CONFIGURATION
+# ========================================
+# Set secrets using: wrangler secret put SECRET_NAME
+# NEVER commit secrets to version control!
+#
+# Required secrets:
+#
+# VoIP.ms SMS Configuration:
+#   wrangler secret put VOIPMS_API_USERNAME
+#   wrangler secret put VOIPMS_API_PASSWORD
+#   wrangler secret put VOIPMS_DID
+#
+# Mailgun Email Configuration:
+#   wrangler secret put MAILGUN_API_KEY
+#   wrangler secret put MAILGUN_DOMAIN
+#   wrangler secret put MAILGUN_FROM
+#
+# Example values (DO NOT UNCOMMENT):
+# VOIPMS_API_USERNAME = "your-email@example.com"
+# VOIPMS_API_PASSWORD = "your-voipms-password"
+# VOIPMS_DID = "12025551234"
+# MAILGUN_API_KEY = "key-xxxxxxxxxxxxxxxxxxxxx"
+# MAILGUN_DOMAIN = "mg.horoscope.boutique"
+# MAILGUN_FROM = "Horoscope Boutique <daily@horoscope.boutique>"
+
+# ========================================
+# BUILD CONFIGURATION
+# ========================================
+[build]
+command = ""  # No build step needed for this project
+
+[build.upload]
+format = "service-worker"
+
+# ========================================
+# DEVELOPMENT ENVIRONMENT
+# ========================================
+[env.development]
+name = "horoscope-boutique-dev"
+vars = { ENVIRONMENT = "development" }
+
+# ========================================
+# STAGING ENVIRONMENT
+# ========================================
+[env.staging]
+name = "horoscope-boutique-staging"
+vars = { ENVIRONMENT = "staging" }
+
+# Note: Create separate D1 databases for dev/staging if needed
