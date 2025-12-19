@@ -1,8 +1,5 @@
 {
-  "routes": [
-    {
-      "pattern": "/api/*",
-      "script": "horoscope-boutique"
-    }
-  ]
+  "version": 1,
+  "include": ["/api/*"],
+  "exclude": []
 }
