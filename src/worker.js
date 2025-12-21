@@ -1,13 +1,14 @@
 /**
  * Horoscope Boutique - Cloudflare Worker
- * Production-ready horoscope subscription service
+ * Production-ready horoscope subscription service with GPT-4
  *
  * Features:
  * - User signup with consent tracking
  * - Automatic zodiac sign derivation from birthday
- * - Daily horoscope delivery via email/SMS
+ * - Morning (9am) + Evening (7pm conditional) horoscope delivery
+ * - GPT-4 powered content generation
  * - Timezone-aware scheduling
- * - One-send-per-day enforcement
+ * - Anti-repetition tracking
  * - Unsubscribe functionality
  */
 
@@ -21,7 +22,7 @@ import {
   isToday,
   getLocalTime
 } from './utils.js';
-import { generateHoroscope, formatHoroscopeSMS, formatHoroscopeEmail, getEmailSubject } from './horoscope.js';
+import { generateMorningHoroscope, generateEveningHoroscope, formatHoroscopeSMS, formatHoroscopeEmail, getEmailSubject } from './horoscope.js';
 import { sendHoroscopeEmail } from './email.js';
 import { sendHoroscopeSMS } from './sms.js';
 
@@ -43,7 +44,8 @@ async function handleSignup(request, env) {
       first_name,
       timezone,
       delivery_method,
-      consent_given
+      consent_given,
+      spicy_allowed
     } = body;
 
     // Validation
@@ -89,6 +91,7 @@ async function handleSignup(request, env) {
     ).bind(email).first();
 
     let userId;
+    const spicyValue = spicy_allowed ? 1 : 0;
 
     if (existingUser) {
       // Update existing user
@@ -96,17 +99,18 @@ async function handleSignup(request, env) {
         UPDATE users
         SET phone_e164 = ?, birthdate = ?, zodiac_sign = ?, first_name = ?,
             timezone = ?, delivery_method = ?, consent_given = 1,
-            consent_at = datetime('now'), is_active = 1, updated_at = datetime('now')
+            consent_at = datetime('now'), is_active = 1, spicy_allowed = ?,
+            updated_at = datetime('now')
         WHERE email = ?
-      `).bind(phoneE164, birthdate, zodiacSign, first_name, timezoneValue, deliveryMethodValue, email).run();
+      `).bind(phoneE164, birthdate, zodiacSign, first_name, timezoneValue, deliveryMethodValue, spicyValue, email).run();
 
       userId = existingUser.id;
     } else {
       // Insert new user
       const result = await env.DB.prepare(`
-        INSERT INTO users (email, phone_e164, birthdate, zodiac_sign, first_name, timezone, delivery_method, consent_given, consent_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
-      `).bind(email, phoneE164, birthdate, zodiacSign, first_name, timezoneValue, deliveryMethodValue).run();
+        INSERT INTO users (email, phone_e164, birthdate, zodiac_sign, first_name, timezone, delivery_method, consent_given, consent_at, spicy_allowed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'), ?)
+      `).bind(email, phoneE164, birthdate, zodiacSign, first_name, timezoneValue, deliveryMethodValue, spicyValue).run();
 
       userId = result.meta.last_row_id;
     }
@@ -114,9 +118,13 @@ async function handleSignup(request, env) {
     // Get updated user
     const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
 
-    // Send immediate horoscope
-    const horoscope = generateHoroscope(user);
+    // Send immediate morning horoscope
+    const recentPatterns = await getRecentPatterns(env, userId);
+    const horoscope = await generateMorningHoroscope(env, user, recentPatterns);
     const sendResults = await sendHoroscope(env, user, horoscope);
+
+    // Log the message
+    await logMessage(env, userId, horoscope);
 
     return jsonResponse({
       success: true,
@@ -168,8 +176,12 @@ async function handleRequest(request, env) {
     }
 
     // Generate and send horoscope
-    const horoscope = generateHoroscope(user);
+    const recentPatterns = await getRecentPatterns(env, user.id);
+    const horoscope = await generateMorningHoroscope(env, user, recentPatterns);
     const sendResults = await sendHoroscope(env, user, horoscope);
+
+    // Log the message
+    await logMessage(env, user.id, horoscope);
 
     return jsonResponse({
       success: true,
@@ -256,9 +268,9 @@ async function handleUnsubscribeGet(request, env) {
         </style>
       </head>
       <body>
-        <h1>✓ Successfully Unsubscribed</h1>
+        <h1>Successfully Unsubscribed</h1>
         <p>You've been unsubscribed from daily horoscope emails.</p>
-        <p>We're sorry to see you go! You can resubscribe anytime at horoscope.boutique</p>
+        <p>You can resubscribe anytime at horoscope.boutique</p>
       </body>
       </html>
     `);
@@ -275,7 +287,7 @@ async function handleUnsubscribeGet(request, env) {
 
 /**
  * Scheduled handler - Runs hourly
- * Checks each user's local time and sends at 9:00 AM
+ * Checks each user's local time and sends at 9:00 AM (morning) and 7:00 PM (evening)
  */
 async function handleScheduled(event, env) {
   console.log('Starting scheduled horoscope delivery check');
@@ -288,7 +300,8 @@ async function handleScheduled(event, env) {
 
     console.log(`Found ${users.length} active users`);
 
-    let sentCount = 0;
+    let morningSent = 0;
+    let eveningSent = 0;
     let skippedCount = 0;
     let errorCount = 0;
 
@@ -296,25 +309,71 @@ async function handleScheduled(event, env) {
       try {
         // Get user's local time
         const localTime = getLocalTime(user.timezone);
+        const hour = localTime.hour;
 
-        // Check if it's 9:00 AM in user's timezone (9:00-9:59)
-        if (localTime.hour !== 9) {
-          continue; // Not 9 AM yet or already past
+        // MORNING EMAIL - 9:00 AM
+        if (hour === 9) {
+          // Check if already sent morning today
+          if (user.last_morning_sent_at && isToday(user.last_morning_sent_at)) {
+            skippedCount++;
+            continue;
+          }
+
+          const recentPatterns = await getRecentPatterns(env, user.id);
+          const horoscope = await generateMorningHoroscope(env, user, recentPatterns);
+          await sendHoroscope(env, user, horoscope);
+          await logMessage(env, user.id, horoscope);
+
+          // Update morning tracking
+          await env.DB.prepare(`
+            UPDATE users
+            SET last_morning_sent_at = datetime('now'),
+                morning_had_friction = ?
+            WHERE id = ?
+          `).bind(horoscope.included_friction ? 1 : 0, user.id).run();
+
+          morningSent++;
+          console.log(`Morning horoscope sent to user ${user.id}`);
         }
 
-        // Check if already sent today
-        if (user.last_sent_at && isToday(user.last_sent_at)) {
-          skippedCount++;
-          console.log(`Skipped user ${user.id}: Already sent today`);
-          continue;
+        // EVENING EMAIL - 7:00 PM (conditional)
+        if (hour === 19) {
+          // Check if already sent evening today
+          if (user.last_evening_sent_at && isToday(user.last_evening_sent_at)) {
+            skippedCount++;
+            continue;
+          }
+
+          // Only send if morning had friction
+          if (!user.morning_had_friction) {
+            continue;
+          }
+
+          const recentPatterns = await getRecentPatterns(env, user.id);
+          const horoscope = await generateEveningHoroscope(env, user, true, recentPatterns);
+
+          if (horoscope) {
+            await sendHoroscope(env, user, horoscope);
+            await logMessage(env, user.id, horoscope);
+
+            // Update evening tracking and spicy timestamp if used
+            if (horoscope.spicy_used) {
+              await env.DB.prepare(`
+                UPDATE users
+                SET last_evening_sent_at = datetime('now'),
+                    last_spicy_at = datetime('now')
+                WHERE id = ?
+              `).bind(user.id).run();
+            } else {
+              await env.DB.prepare(`
+                UPDATE users SET last_evening_sent_at = datetime('now') WHERE id = ?
+              `).bind(user.id).run();
+            }
+
+            eveningSent++;
+            console.log(`Evening horoscope sent to user ${user.id}`);
+          }
         }
-
-        // Generate and send horoscope
-        const horoscope = generateHoroscope(user);
-        await sendHoroscope(env, user, horoscope);
-
-        sentCount++;
-        console.log(`Sent horoscope to user ${user.id} (${user.email})`);
 
       } catch (error) {
         errorCount++;
@@ -322,7 +381,7 @@ async function handleScheduled(event, env) {
       }
     }
 
-    console.log(`Scheduled delivery complete: ${sentCount} sent, ${skippedCount} skipped, ${errorCount} errors`);
+    console.log(`Scheduled delivery complete: ${morningSent} morning, ${eveningSent} evening, ${skippedCount} skipped, ${errorCount} errors`);
 
   } catch (error) {
     console.error('Scheduled handler error:', error);
@@ -330,8 +389,49 @@ async function handleScheduled(event, env) {
 }
 
 // ========================================
-// UTILITY FUNCTIONS
+// HELPER FUNCTIONS
 // ========================================
+
+/**
+ * Get recent reframe patterns for anti-repetition
+ */
+async function getRecentPatterns(env, userId) {
+  try {
+    const { results } = await env.DB.prepare(`
+      SELECT reframe_pattern FROM message_history
+      WHERE user_id = ?
+      ORDER BY sent_at DESC
+      LIMIT 5
+    `).bind(userId).all();
+
+    return results.map(r => r.reframe_pattern);
+  } catch (e) {
+    // Table might not exist yet
+    return [];
+  }
+}
+
+/**
+ * Log message to history for anti-repetition tracking
+ */
+async function logMessage(env, userId, horoscope) {
+  try {
+    await env.DB.prepare(`
+      INSERT INTO message_history (user_id, message_type, reframe_pattern, had_friction, spicy_used, subject)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      userId,
+      horoscope.type,
+      horoscope.reframe_pattern,
+      horoscope.included_friction ? 1 : 0,
+      horoscope.spicy_used ? 1 : 0,
+      horoscope.subject
+    ).run();
+  } catch (e) {
+    console.error('Failed to log message:', e);
+    // Non-fatal, continue
+  }
+}
 
 /**
  * Send horoscope via user's preferred delivery method
@@ -448,7 +548,8 @@ export default {
     if (url.pathname === '/' || url.pathname === '/api') {
       return jsonResponse({
         service: 'Horoscope Boutique API',
-        version: '1.0.0',
+        version: '2.0.0',
+        features: ['GPT-4 powered', 'Morning + Evening emails', 'Anti-repetition'],
         endpoints: {
           'POST /api/signup': 'Register for daily horoscopes',
           'POST /api/request': 'Manually request today\'s horoscope',
