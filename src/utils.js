@@ -136,7 +136,7 @@ export function getLocalTime(timezone) {
 }
 
 /**
- * Generate random alphanumeric token
+ * Generate random alphanumeric token (legacy - use generateSecureToken for security-sensitive contexts)
  * @param {number} length - Token length
  * @returns {string} - Random token
  */
@@ -147,6 +147,17 @@ export function generateToken(length = 32) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
+}
+
+/**
+ * Generate cryptographically secure random token using Web Crypto API
+ * @param {number} length - Token length in bytes (output will be 2x in hex)
+ * @returns {string} - Secure hex token
+ */
+export function generateSecureToken(length = 32) {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**

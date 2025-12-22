@@ -46,6 +46,7 @@ crons = ["0 * * * *"]  # Every hour at minute 0
 [vars]
 # These are non-sensitive variables
 ENVIRONMENT = "production"
+BASE_URL = "https://horoscope.boutique"
 
 # ========================================
 # SECRETS CONFIGURATION
@@ -87,13 +88,13 @@ format = "service-worker"
 # ========================================
 [env.development]
 name = "horoscope-boutique-dev"
-vars = { ENVIRONMENT = "development" }
+vars = { ENVIRONMENT = "development", BASE_URL = "http://localhost:8787" }
 
 # ========================================
 # STAGING ENVIRONMENT
 # ========================================
 [env.staging]
 name = "horoscope-boutique-staging"
-vars = { ENVIRONMENT = "staging" }
+vars = { ENVIRONMENT = "staging", BASE_URL = "https://staging.horoscope.boutique" }
 
 # Note: Create separate D1 databases for dev/staging if needed

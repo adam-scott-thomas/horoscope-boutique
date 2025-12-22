@@ -45,6 +45,21 @@ CREATE INDEX IF NOT EXISTS idx_tokens_token ON auth_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_tokens_user ON auth_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_expires ON auth_tokens(expires_at);
 
+-- Unsubscribe Tokens Table - secure, opaque, one-time unsubscribe links
+CREATE TABLE IF NOT EXISTS unsubscribe_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token TEXT UNIQUE NOT NULL,  -- 64-char hex token
+    expires_at TEXT NOT NULL,  -- ISO 8601 timestamp (30 days from creation)
+    used INTEGER NOT NULL DEFAULT 0,  -- Boolean: 0 = unused, 1 = used
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_unsub_token ON unsubscribe_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_unsub_user ON unsubscribe_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_unsub_expires ON unsubscribe_tokens(expires_at);
+
 -- Delivery Log Table (optional - for audit trail and debugging)
 CREATE TABLE IF NOT EXISTS delivery_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,3 +80,17 @@ AFTER UPDATE ON users
 BEGIN
     UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
+
+-- Rate Limiting Table - sliding window rate limiting by IP and endpoint
+CREATE TABLE IF NOT EXISTS rate_limits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip_address TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    request_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_ip_endpoint ON rate_limits(ip_address, endpoint);
+CREATE INDEX IF NOT EXISTS idx_rate_request_at ON rate_limits(request_at);
+
+-- Cleanup old rate limit entries (run periodically via scheduled task)
+-- DELETE FROM rate_limits WHERE request_at < datetime('now', '-1 hour');

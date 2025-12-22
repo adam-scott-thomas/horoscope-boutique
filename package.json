@@ -12,7 +12,14 @@
     "db:execute": "wrangler d1 execute horoscope-boutique-db --file=./schema.sql",
     "db:query": "wrangler d1 execute horoscope-boutique-db --command",
     "pages:dev": "wrangler pages dev public",
-    "pages:deploy": "wrangler pages deploy public --project-name=horoscope-boutique"
+    "pages:deploy": "wrangler pages deploy public --project-name=horoscope-boutique",
+    "lint": "eslint src/ --ext .js",
+    "lint:fix": "eslint src/ --ext .js --fix",
+    "format": "prettier --write 'src/**/*.js' 'public/**/*.js'",
+    "format:check": "prettier --check 'src/**/*.js' 'public/**/*.js'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "horoscope",
@@ -28,6 +35,12 @@
   "author": "Your Name",
   "license": "MIT",
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.5.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.5",
+    "vitest": "^2.0.0",
     "wrangler": "^3.22.0"
   },
   "engines": {

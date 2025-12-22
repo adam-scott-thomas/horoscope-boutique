@@ -1,0 +1,39 @@
+{
+  "env": {
+    "es2022": true,
+    "worker": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:import/recommended",
+    "prettier"
+  ],
+  "plugins": ["import"],
+  "rules": {
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "no-console": ["warn", { "allow": ["error", "warn", "log"] }],
+    "prefer-const": "error",
+    "no-var": "error",
+    "eqeqeq": ["error", "always"],
+    "curly": ["error", "all"],
+    "import/order": ["error", {
+      "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
+      "newlines-between": "always"
+    }],
+    "import/no-unresolved": "off"
+  },
+  "globals": {
+    "crypto": "readonly",
+    "Response": "readonly",
+    "Request": "readonly",
+    "URL": "readonly",
+    "FormData": "readonly",
+    "fetch": "readonly",
+    "btoa": "readonly",
+    "Intl": "readonly"
+  }
+}
