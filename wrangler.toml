@@ -24,8 +24,8 @@ workers_dev = true
 # After creating your D1 database, add the binding here
 [[d1_databases]]
 binding = "DB"
-database_name = "horoscope-boutique-db"
-database_id = "YOUR_DATABASE_ID_HERE"
+database_name = "horoscope-boutique"
+database_id = "f7aa1570-f99c-4d52-ab95-defe8622b55c"
 
 # ========================================
 # SCHEDULED CRON TRIGGER
