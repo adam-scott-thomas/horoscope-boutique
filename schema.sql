@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     consent_at TEXT,  -- ISO 8601 timestamp of when consent was given
     is_active INTEGER NOT NULL DEFAULT 1,  -- Boolean: 0 = inactive/unsubscribed, 1 = active
     last_sent_at TEXT,  -- ISO 8601 timestamp of last horoscope delivery
+    seen_questions TEXT,  -- JSON array of question IDs user has seen (resets on exhaustion)
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -357,10 +357,10 @@ async function sendHoroscope(env, user, horoscope) {
       }
     }
 
-    // Update last_sent_at
+    // Update last_sent_at and seen_questions
     await env.DB.prepare(
-      'UPDATE users SET last_sent_at = datetime(\'now\') WHERE id = ?'
-    ).bind(user.id).run();
+      'UPDATE users SET last_sent_at = datetime(\'now\'), seen_questions = ? WHERE id = ?'
+    ).bind(JSON.stringify(horoscope.seenQuestions), user.id).run();
 
     // Log delivery
     const deliveryStatus = (results.email?.success || results.sms?.success) ? 'success' : 'failed';

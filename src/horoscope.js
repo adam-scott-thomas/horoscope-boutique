@@ -5,6 +5,12 @@
 
 import { getLuckyColor } from './zodiac.js';
 import { randomChoice } from './utils.js';
+import {
+  selectQuestion,
+  shouldIncludeSmsQuestion,
+  formatEmailQuestion,
+  formatSmsQuestion
+} from './questions.js';
 
 const MANTRAS = [
   'I am exactly where I need to be',
@@ -56,12 +62,18 @@ const HOROSCOPE_TEMPLATES = [
 /**
  * Generate a personalized horoscope
  * @param {Object} user - User object from database
- * @returns {Object} - Horoscope data
+ * @returns {Object} - Horoscope data including question and updated seen list
  */
 export function generateHoroscope(user) {
   const template = randomChoice(HOROSCOPE_TEMPLATES);
   const name = user.first_name || 'Friend';
   const sign = user.zodiac_sign;
+
+  // Select non-repeating question
+  const { question, seenQuestions } = selectQuestion(user.seen_questions);
+
+  // Determine SMS question inclusion (probabilistic gate)
+  const includeSmsQuestion = shouldIncludeSmsQuestion();
 
   return {
     user_id: user.id,
@@ -71,6 +83,9 @@ export function generateHoroscope(user) {
     lucky_color: getLuckyColor(sign),
     mantra: randomChoice(MANTRAS),
     daily_focus: randomChoice(DAILY_FOCUS),
+    question: question,
+    includeSmsQuestion: includeSmsQuestion,
+    seenQuestions: seenQuestions,
     date: new Date().toISOString().split('T')[0],
     generated_at: new Date().toISOString()
   };
@@ -86,8 +101,17 @@ export function formatHoroscopeSMS(data) {
   msg += `${data.horoscope}\n\n`;
   msg += `🎨 Lucky Color: ${data.lucky_color}\n`;
   msg += `💫 Mantra: ${data.mantra}\n`;
-  msg += `🎯 Focus: ${data.daily_focus}\n\n`;
-  msg += `Reply STOP to unsubscribe`;
+  msg += `🎯 Focus: ${data.daily_focus}`;
+
+  // Include question if gate passed
+  if (data.includeSmsQuestion && data.question) {
+    const formattedQuestion = formatSmsQuestion(data.question);
+    if (formattedQuestion) {
+      msg += `\n\n${formattedQuestion}`;
+    }
+  }
+
+  msg += `\n\nReply STOP to unsubscribe`;
   return msg;
 }
 
@@ -154,6 +178,17 @@ export function formatHoroscopeEmail(data, unsubscribeUrl) {
                             </table>
                         </td>
                     </tr>
+
+                    <!-- Reflection Question -->
+                    ${data.question ? `
+                    <tr>
+                        <td style="padding: 0 35px 40px 35px;">
+                            <div style="color: #666; font-size: 14px; font-style: italic; line-height: 1.6; border-left: 3px solid #e6eaf0; padding-left: 16px;">
+                                ${formatEmailQuestion(data.question)}
+                            </div>
+                        </td>
+                    </tr>
+                    ` : ''}
 
                     <!-- Footer -->
                     <tr>
