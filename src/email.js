@@ -1,59 +1,177 @@
 /**
- * Email Service Integration (Mailgun)
- * Handles email delivery via Mailgun API
- *
- * IMPORTANT: Supports both US and EU Mailgun regions.
- * Set MAILGUN_REGION=eu for EU accounts, or leave unset/us for US accounts.
+ * Email Service Integration (AWS SES)
+ * Handles email delivery via AWS Simple Email Service
  */
 
 /**
- * Get the Mailgun API base URL based on region
- * @param {string} region - 'us' or 'eu' (defaults to 'us')
- * @returns {string} - Mailgun API base URL
+ * Create HMAC-SHA256 signature
  */
-function getMailgunBaseUrl(region) {
-  const normalizedRegion = (region || 'us').toLowerCase().trim();
-  if (normalizedRegion === 'eu') {
-    return 'https://api.eu.mailgun.net/v3';
-  }
-  return 'https://api.mailgun.net/v3';
+async function hmacSha256(key, message) {
+  const encoder = new TextEncoder();
+  const keyData = typeof key === 'string' ? encoder.encode(key) : key;
+  const messageData = encoder.encode(message);
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+  return new Uint8Array(signature);
 }
 
 /**
- * Send email via Mailgun
+ * Create SHA-256 hash
+ */
+async function sha256(message) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Convert Uint8Array to hex string
+ */
+function toHex(buffer) {
+  return Array.from(buffer)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Get AWS Signature Version 4 signing key
+ */
+async function getSigningKey(secretKey, dateStamp, region, service) {
+  const kDate = await hmacSha256('AWS4' + secretKey, dateStamp);
+  const kRegion = await hmacSha256(kDate, region);
+  const kService = await hmacSha256(kRegion, service);
+  const kSigning = await hmacSha256(kService, 'aws4_request');
+  return kSigning;
+}
+
+/**
+ * Sign AWS request with Signature Version 4
+ */
+async function signAwsRequest(method, url, headers, body, accessKeyId, secretAccessKey, region, service) {
+  const urlObj = new URL(url);
+  const host = urlObj.host;
+  const path = urlObj.pathname;
+
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+
+  // Create canonical request
+  const signedHeaders = 'content-type;host;x-amz-date';
+  const payloadHash = await sha256(body);
+
+  const canonicalRequest = [
+    method,
+    path,
+    '', // query string
+    `content-type:${headers['Content-Type']}\n`,
+    `host:${host}\n`,
+    `x-amz-date:${amzDate}\n`,
+    '',
+    signedHeaders,
+    payloadHash
+  ].join('\n');
+
+  // Create string to sign
+  const algorithm = 'AWS4-HMAC-SHA256';
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const canonicalRequestHash = await sha256(canonicalRequest);
+
+  const stringToSign = [
+    algorithm,
+    amzDate,
+    credentialScope,
+    canonicalRequestHash
+  ].join('\n');
+
+  // Calculate signature
+  const signingKey = await getSigningKey(secretAccessKey, dateStamp, region, service);
+  const signature = toHex(await hmacSha256(signingKey, stringToSign));
+
+  // Create authorization header
+  const authorization = `${algorithm} Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  return {
+    ...headers,
+    'Host': host,
+    'X-Amz-Date': amzDate,
+    'Authorization': authorization
+  };
+}
+
+/**
+ * Send email via AWS SES
  * @param {Object} env - Environment variables
  * @param {string} to - Recipient email address
  * @param {string} subject - Email subject
  * @param {string} htmlBody - HTML email body
- * @returns {Promise<Object>} - Mailgun response
+ * @returns {Promise<Object>} - SES response
  */
 export async function sendEmail(env, to, subject, htmlBody) {
-  if (!env.MAILGUN_API_KEY || !env.MAILGUN_DOMAIN || !env.MAILGUN_FROM) {
-    throw new Error('Mailgun environment variables not configured');
+  if (!env.AWS_SES_ACCESS_KEY_ID || !env.AWS_SES_SECRET_ACCESS_KEY || !env.AWS_SES_FROM) {
+    throw new Error('AWS SES environment variables not configured');
   }
 
-  const formData = new FormData();
-  formData.append('from', env.MAILGUN_FROM);
-  formData.append('to', to);
-  formData.append('subject', subject);
-  formData.append('html', htmlBody);
+  const region = env.AWS_SES_REGION || 'us-east-1';
+  const endpoint = `https://email.${region}.amazonaws.com/v2/email/outbound-emails`;
 
-  const baseUrl = getMailgunBaseUrl(env.MAILGUN_REGION);
+  const emailPayload = {
+    Content: {
+      Simple: {
+        Subject: {
+          Data: subject,
+          Charset: 'UTF-8'
+        },
+        Body: {
+          Html: {
+            Data: htmlBody,
+            Charset: 'UTF-8'
+          }
+        }
+      }
+    },
+    Destination: {
+      ToAddresses: [to]
+    },
+    FromEmailAddress: env.AWS_SES_FROM
+  };
 
-  const response = await fetch(
-    `${baseUrl}/${env.MAILGUN_DOMAIN}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: 'Basic ' + btoa(`api:${env.MAILGUN_API_KEY}`)
-      },
-      body: formData
-    }
+  const body = JSON.stringify(emailPayload);
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+
+  const signedHeaders = await signAwsRequest(
+    'POST',
+    endpoint,
+    headers,
+    body,
+    env.AWS_SES_ACCESS_KEY_ID,
+    env.AWS_SES_SECRET_ACCESS_KEY,
+    region,
+    'ses'
   );
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: signedHeaders,
+    body: body
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Mailgun API error (${response.status}): ${errorText}`);
+    throw new Error(`AWS SES API error (${response.status}): ${errorText}`);
   }
 
   return await response.json();
@@ -76,8 +194,8 @@ export async function sendHoroscopeEmail(env, email, subject, htmlBody, maxRetri
       const result = await sendEmail(env, email, subject, htmlBody);
       return {
         success: true,
-        provider: 'mailgun',
-        message_id: result.id,
+        provider: 'ses',
+        message_id: result.MessageId,
         attempt: attempt
       };
     } catch (error) {

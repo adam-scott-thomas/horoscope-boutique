@@ -60,19 +60,20 @@ ENVIRONMENT = "production"
 #   wrangler secret put VOIPMS_API_PASSWORD
 #   wrangler secret put VOIPMS_DID
 #
-# Mailgun Email Configuration:
-#   wrangler secret put MAILGUN_API_KEY
-#   wrangler secret put MAILGUN_DOMAIN
-#   wrangler secret put MAILGUN_FROM
-#   wrangler secret put MAILGUN_REGION  # Optional: 'us' (default) or 'eu' for EU accounts
+# AWS SES Email Configuration:
+#   wrangler secret put AWS_SES_ACCESS_KEY_ID
+#   wrangler secret put AWS_SES_SECRET_ACCESS_KEY
+#   wrangler secret put AWS_SES_FROM
+#   wrangler secret put AWS_SES_REGION  # Optional: defaults to 'us-east-1'
 #
 # Example values (DO NOT UNCOMMENT):
 # VOIPMS_API_USERNAME = "your-email@example.com"
 # VOIPMS_API_PASSWORD = "your-voipms-password"
 # VOIPMS_DID = "12025551234"
-# MAILGUN_API_KEY = "key-xxxxxxxxxxxxxxxxxxxxx"
-# MAILGUN_DOMAIN = "mg.horoscope.boutique"
-# MAILGUN_FROM = "Horoscope Boutique <daily@horoscope.boutique>"
+# AWS_SES_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"
+# AWS_SES_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+# AWS_SES_FROM = "Horoscope Boutique <daily@horoscope.boutique>"
+# AWS_SES_REGION = "us-east-1"
 
 # ========================================
 # BUILD CONFIGURATION

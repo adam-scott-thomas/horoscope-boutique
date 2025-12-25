@@ -296,85 +296,105 @@ const HTML_TEMPLATE_COUPLES = (data) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-/**
- * Get Mailgun API base URL based on region
- * @param {string} region - 'us' or 'eu' (defaults to 'us')
- * @returns {string} - Mailgun API base URL
- */
-function getMailgunBaseUrl(region) {
-  const normalizedRegion = (region || 'us').toLowerCase().trim();
-  if (normalizedRegion === 'eu') {
-    return 'https://api.eu.mailgun.net/v3';
-  }
-  return 'https://api.mailgun.net/v3';
+// ========================================
+// AWS SES SIGNING FUNCTIONS
+// ========================================
+
+async function hmacSha256(key, message) {
+  const encoder = new TextEncoder();
+  const keyData = typeof key === 'string' ? encoder.encode(key) : key;
+  const messageData = encoder.encode(message);
+  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+  return new Uint8Array(signature);
 }
 
-async function sendEmailMailgun(env, to, subject, htmlBody) {
-  const formData = new FormData();
-  formData.append('from', env.MAILGUN_FROM);
-  formData.append('to', to);
-  formData.append('subject', subject);
-  formData.append('html', htmlBody);
+async function sha256(message) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
-  const baseUrl = getMailgunBaseUrl(env.MAILGUN_REGION);
+function toHex(buffer) {
+  return Array.from(buffer).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
-  const response = await fetch(
-    `${baseUrl}/${env.MAILGUN_DOMAIN}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + btoa(`api:${env.MAILGUN_API_KEY}`)
-      },
-      body: formData
-    }
-  );
+async function getSigningKey(secretKey, dateStamp, region, service) {
+  const kDate = await hmacSha256('AWS4' + secretKey, dateStamp);
+  const kRegion = await hmacSha256(kDate, region);
+  const kService = await hmacSha256(kRegion, service);
+  return await hmacSha256(kService, 'aws4_request');
+}
+
+async function signAwsRequest(method, url, headers, body, accessKeyId, secretAccessKey, region, service) {
+  const urlObj = new URL(url);
+  const host = urlObj.host;
+  const path = urlObj.pathname;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+
+  const signedHeaders = 'content-type;host;x-amz-date';
+  const payloadHash = await sha256(body);
+  const canonicalRequest = [method, path, '', `content-type:${headers['Content-Type']}\n`, `host:${host}\n`, `x-amz-date:${amzDate}\n`, '', signedHeaders, payloadHash].join('\n');
+
+  const algorithm = 'AWS4-HMAC-SHA256';
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const canonicalRequestHash = await sha256(canonicalRequest);
+  const stringToSign = [algorithm, amzDate, credentialScope, canonicalRequestHash].join('\n');
+
+  const signingKey = await getSigningKey(secretAccessKey, dateStamp, region, service);
+  const signature = toHex(await hmacSha256(signingKey, stringToSign));
+  const authorization = `${algorithm} Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  return { ...headers, 'Host': host, 'X-Amz-Date': amzDate, 'Authorization': authorization };
+}
+
+// ========================================
+// EMAIL FUNCTIONS (AWS SES)
+// ========================================
+
+async function sendEmailSES(env, to, subject, htmlBody) {
+  if (!env.AWS_SES_ACCESS_KEY_ID || !env.AWS_SES_SECRET_ACCESS_KEY || !env.AWS_SES_FROM) {
+    throw new Error('AWS SES environment variables not configured');
+  }
+
+  const region = env.AWS_SES_REGION || 'us-east-1';
+  const endpoint = `https://email.${region}.amazonaws.com/v2/email/outbound-emails`;
+
+  const emailPayload = {
+    Content: {
+      Simple: {
+        Subject: { Data: subject, Charset: 'UTF-8' },
+        Body: { Html: { Data: htmlBody, Charset: 'UTF-8' } }
+      }
+    },
+    Destination: { ToAddresses: [to] },
+    FromEmailAddress: env.AWS_SES_FROM
+  };
+
+  const body = JSON.stringify(emailPayload);
+  const headers = { 'Content-Type': 'application/json' };
+  const signedHeaders = await signAwsRequest('POST', endpoint, headers, body, env.AWS_SES_ACCESS_KEY_ID, env.AWS_SES_SECRET_ACCESS_KEY, region, 'ses');
+
+  const response = await fetch(endpoint, { method: 'POST', headers: signedHeaders, body: body });
 
   if (!response.ok) {
-    throw new Error(`Mailgun error: ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`AWS SES error (${response.status}): ${errorText}`);
   }
 
   return await response.json();
 }
 
-async function sendEmailSendGrid(env, to, subject, htmlBody) {
-  const payload = {
-    personalizations: [{ to: [{ email: to }] }],
-    from: { email: env.SENDGRID_FROM },
-    subject: subject,
-    content: [{ type: 'text/html', value: htmlBody }]
-  };
-  
-  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.SENDGRID_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-  
-  if (!response.ok) {
-    throw new Error(`SendGrid error: ${response.status}`);
-  }
-  
-  return { success: true };
-}
-
 async function sendHoroscopeEmail(env, email, horoscopeData, isCouples = false) {
   const subject = isCouples ? 'Your Couples Horoscope' : 'Your Daily Horoscope';
-  const htmlBody = isCouples 
+  const htmlBody = isCouples
     ? HTML_TEMPLATE_COUPLES(horoscopeData)
     : HTML_TEMPLATE_SINGLE(horoscopeData);
-  
-  const provider = env.EMAIL_PROVIDER || 'mailgun';
-  
-  if (provider === 'mailgun') {
-    return await sendEmailMailgun(env, email, subject, htmlBody);
-  } else if (provider === 'sendgrid') {
-    return await sendEmailSendGrid(env, email, subject, htmlBody);
-  } else {
-    throw new Error(`Unknown email provider: ${provider}`);
-  }
+
+  return await sendEmailSES(env, email, subject, htmlBody);
 }
 
 // ========================================
