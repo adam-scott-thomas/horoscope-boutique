@@ -262,6 +262,22 @@ def send_email_smtp(
         }
 
 
+def get_mailgun_base_url(region: str = "us") -> str:
+    """
+    Get Mailgun API base URL based on region.
+
+    Args:
+        region: 'us' or 'eu' (defaults to 'us')
+
+    Returns:
+        Mailgun API base URL
+    """
+    normalized_region = (region or "us").lower().strip()
+    if normalized_region == "eu":
+        return "https://api.eu.mailgun.net/v3"
+    return "https://api.mailgun.net/v3"
+
+
 def send_email_mailgun(
     api_key: str,
     domain: str,
@@ -269,11 +285,12 @@ def send_email_mailgun(
     to_email: str,
     subject: str,
     html_body: str,
-    text_body: str
+    text_body: str,
+    region: str = "us"
 ) -> Dict:
     """
     Send email via Mailgun API.
-    
+
     Args:
         api_key: Mailgun API key
         domain: Mailgun domain
@@ -282,12 +299,14 @@ def send_email_mailgun(
         subject: Email subject
         html_body: HTML email body
         text_body: Plain text fallback
-    
+        region: 'us' (default) or 'eu' for EU accounts
+
     Returns:
         Dict with sending status
     """
     try:
-        url = f"https://api.mailgun.net/v3/{domain}/messages"
+        base_url = get_mailgun_base_url(region)
+        url = f"{base_url}/{domain}/messages"
         
         data = {
             "from": from_email,

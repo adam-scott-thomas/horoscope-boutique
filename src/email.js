@@ -1,7 +1,23 @@
 /**
  * Email Service Integration (Mailgun)
  * Handles email delivery via Mailgun API
+ *
+ * IMPORTANT: Supports both US and EU Mailgun regions.
+ * Set MAILGUN_REGION=eu for EU accounts, or leave unset/us for US accounts.
  */
+
+/**
+ * Get the Mailgun API base URL based on region
+ * @param {string} region - 'us' or 'eu' (defaults to 'us')
+ * @returns {string} - Mailgun API base URL
+ */
+function getMailgunBaseUrl(region) {
+  const normalizedRegion = (region || 'us').toLowerCase().trim();
+  if (normalizedRegion === 'eu') {
+    return 'https://api.eu.mailgun.net/v3';
+  }
+  return 'https://api.mailgun.net/v3';
+}
 
 /**
  * Send email via Mailgun
@@ -22,8 +38,10 @@ export async function sendEmail(env, to, subject, htmlBody) {
   formData.append('subject', subject);
   formData.append('html', htmlBody);
 
+  const baseUrl = getMailgunBaseUrl(env.MAILGUN_REGION);
+
   const response = await fetch(
-    `https://api.mailgun.net/v3/${env.MAILGUN_DOMAIN}/messages`,
+    `${baseUrl}/${env.MAILGUN_DOMAIN}/messages`,
     {
       method: 'POST',
       headers: {

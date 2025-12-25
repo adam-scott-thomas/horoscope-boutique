@@ -64,6 +64,7 @@ ENVIRONMENT = "production"
 #   wrangler secret put MAILGUN_API_KEY
 #   wrangler secret put MAILGUN_DOMAIN
 #   wrangler secret put MAILGUN_FROM
+#   wrangler secret put MAILGUN_REGION  # Optional: 'us' (default) or 'eu' for EU accounts
 #
 # Example values (DO NOT UNCOMMENT):
 # VOIPMS_API_USERNAME = "your-email@example.com"

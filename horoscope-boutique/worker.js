@@ -296,15 +296,30 @@ const HTML_TEMPLATE_COUPLES = (data) => `<!DOCTYPE html>
 </body>
 </html>`;
 
+/**
+ * Get Mailgun API base URL based on region
+ * @param {string} region - 'us' or 'eu' (defaults to 'us')
+ * @returns {string} - Mailgun API base URL
+ */
+function getMailgunBaseUrl(region) {
+  const normalizedRegion = (region || 'us').toLowerCase().trim();
+  if (normalizedRegion === 'eu') {
+    return 'https://api.eu.mailgun.net/v3';
+  }
+  return 'https://api.mailgun.net/v3';
+}
+
 async function sendEmailMailgun(env, to, subject, htmlBody) {
   const formData = new FormData();
   formData.append('from', env.MAILGUN_FROM);
   formData.append('to', to);
   formData.append('subject', subject);
   formData.append('html', htmlBody);
-  
+
+  const baseUrl = getMailgunBaseUrl(env.MAILGUN_REGION);
+
   const response = await fetch(
-    `https://api.mailgun.net/v3/${env.MAILGUN_DOMAIN}/messages`,
+    `${baseUrl}/${env.MAILGUN_DOMAIN}/messages`,
     {
       method: 'POST',
       headers: {
@@ -313,11 +328,11 @@ async function sendEmailMailgun(env, to, subject, htmlBody) {
       body: formData
     }
   );
-  
+
   if (!response.ok) {
     throw new Error(`Mailgun error: ${response.status}`);
   }
-  
+
   return await response.json();
 }
 

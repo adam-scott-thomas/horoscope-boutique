@@ -223,8 +223,22 @@ async function sendEmailSMTP({
 }
 
 /**
+ * Get Mailgun API base URL based on region
+ * @param {string} region - 'us' or 'eu' (defaults to 'us')
+ * @returns {string} - Mailgun API base URL
+ */
+function getMailgunBaseUrl(region) {
+  const normalizedRegion = (region || 'us').toLowerCase().trim();
+  if (normalizedRegion === 'eu') {
+    return 'https://api.eu.mailgun.net/v3';
+  }
+  return 'https://api.mailgun.net/v3';
+}
+
+/**
  * Send email via Mailgun API
  * @param {Object} params - Email parameters
+ * @param {string} params.region - Optional: 'us' (default) or 'eu' for EU accounts
  * @returns {Promise<Object>} Sending result
  */
 async function sendEmailMailgun({
@@ -234,7 +248,8 @@ async function sendEmailMailgun({
   toEmail,
   subject,
   htmlBody,
-  textBody
+  textBody,
+  region = 'us'
 }) {
   try {
     const formData = new FormData();
@@ -243,11 +258,12 @@ async function sendEmailMailgun({
     formData.append('subject', subject);
     formData.append('text', textBody);
     formData.append('html', htmlBody);
-    
+
     const auth = Buffer.from(`api:${apiKey}`).toString('base64');
-    
+    const baseUrl = getMailgunBaseUrl(region);
+
     const response = await fetch(
-      `https://api.mailgun.net/v3/${domain}/messages`,
+      `${baseUrl}/${domain}/messages`,
       {
         method: 'POST',
         headers: {
